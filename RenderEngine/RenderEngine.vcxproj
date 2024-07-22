@@ -138,10 +138,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="RenderEngine.cpp" />
-    <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\Downloads\SDL-release-2.30.5\SDL-release-2.30.5\include\SDL.h" />
+    <ClInclude Include="methods.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
