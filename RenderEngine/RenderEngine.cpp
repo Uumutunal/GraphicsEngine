@@ -1,8 +1,10 @@
 #include <SDL.h>
 #include<iostream>
 #include<vector>
-
+#include<math.h>
+#include <chrono>
 #include"methods.h"
+#include <map>
 
 using namespace std;
 
@@ -49,6 +51,8 @@ private:
 public:
 	vector<vertex> vertices;
 
+	map<int, vertex> verts;
+
 	vector<face> faces;
 
 	vec3d origin;
@@ -62,7 +66,11 @@ public:
 			v.p = verticesA[i].p;
 			v.id = index;
 			vertices.push_back(v);
+
+			verts[index] = verticesA[i];
+
 			index++;
+
 		}
 	}
 
@@ -161,6 +169,29 @@ void fillTriangle(vector<vec3d> vertices) {
 	if (vertices.size() < 3) {
 		return;
 	}
+
+
+	vec3d top;
+	vec3d bot;
+
+
+	float max = -99999999;
+	float min = 99999999;
+	for (int i = 0; i < vertices.size(); i++)
+	{
+		if (vertices[i].x > max) {
+			max = vertices[i].x;
+			top = vertices[i];
+		}
+		if (vertices[i].x < min) {
+			min = vertices[i].x;
+			bot = vertices[i];
+		}
+
+	}
+
+
+
 	vertices.push_back(vertices[0]);
 	vertices.push_back(vertices[1]);
 
@@ -191,7 +222,7 @@ void fillTriangle(vector<vec3d> vertices) {
 	//B = x1 - x2
 	//C = (x2 * y1) - (x1 * y2)
 	float a = longestEdge[1].y - longestEdge[0].y;
-	float b = longestEdge[0].x - longestEdge[1].x;
+	float b = (longestEdge[0].x - longestEdge[1].x);
 	float c = (longestEdge[1].x * longestEdge[0].y) - (longestEdge[0].x * longestEdge[1].y);
 
 	//Equation for the parallel line that passes through the third point, Ax + By + D = 0
@@ -200,18 +231,175 @@ void fillTriangle(vector<vec3d> vertices) {
 
 	//Equations for the other edges
 	float a2 = longestEdge[1].y - thirdVertex.y;
-	float b2 = thirdVertex.x - longestEdge[1].x;
+	float b2 = (thirdVertex.x - longestEdge[1].x);
 	float c2 = (longestEdge[1].x * thirdVertex.y) - (thirdVertex.x * longestEdge[1].y);
 
 	float a3 = thirdVertex.y - longestEdge[0].y;
-	float b3 = longestEdge[0].x - thirdVertex.x;
+	float b3 = (longestEdge[0].x - thirdVertex.x);
 	float c3 = (thirdVertex.x * longestEdge[0].y) - (longestEdge[0].x * thirdVertex.y);
 
 	//Loop through the points on the longest edge
 
 
-	for (float x = longestEdge[0].x; x < longestEdge[1].x; x++)
+
+	for (float x = min; x < max; x++)
 	{
+		float p1 = (-a * x - c) / b;
+		float p2 = (-a2 * x - c2) / b2;
+		float p3 = (-a3 * x - c3) / b3;
+
+
+		float l1 = (top.x - x) * (top.x - x) + (top.y - p1) * (top.y - p1);
+		float l2 = (top.x - x) * (top.x - x) + (top.y - p2) * (top.y - p2);
+		float l3 = (top.x - x) * (top.x - x) + (top.y - p3) * (top.y - p3);
+
+		float A;
+		float B;
+		float C;
+
+		if ((a * top.x + b * top.y + c) == 0 && (a * bot.x + b * bot.y + c) == 0) {
+			A = a;
+			B = b;
+			C = c;
+		}
+		else if ((a2 * top.x + b2 * top.y + c2) == 0 && (a2 * bot.x + b2 * bot.y + c2) == 0) {
+			A = a2;
+			B = b2;
+			C = c2;
+		}
+		else if ((a3 * top.x + b3 * top.y + c3) == 0 && (a3 * bot.x + b3 * bot.y + c3) == 0) {
+			A = a3;
+			B = b3;
+			C = c3;
+		}
+		A = bot.y - top.y;
+		B = (top.x - bot.x);
+		C = (bot.x * top.y) - (top.x * bot.y);
+
+
+		if (abs(A * x + B * p1 + C) <= 0.01) {
+			float lH1 = abs(p1 - p2);
+			float lH2 = abs(p1 - p3);
+
+
+			if (lH1 < lH2) {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p1 + HEIGHT / 2},
+				{x + WIDTH / 2, p2 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+			else {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p1 + HEIGHT / 2},
+				{x + WIDTH / 2, p3 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+
+		}
+		if (abs(A * x + B * p2 + C) <= 0.01) {
+			float lH1 = abs(p2 - p1);
+			float lH2 = abs(p2 - p3);
+
+
+			if (lH1 < lH2) {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p2 + HEIGHT / 2},
+				{x + WIDTH / 2, p1 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+			else {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p2 + HEIGHT / 2},
+				{x + WIDTH / 2, p3 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+		}
+		if (abs(A * x + B * p3 + C) <= 0.01) {
+			float lH1 = abs(p3 - p2);
+			float lH2 = abs(p3 - p1);
+
+
+			if (lH1 < lH2) {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p3 + HEIGHT / 2},
+				{x + WIDTH / 2, p2 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+			else {
+				SDL_Point points[2] = {
+				{x + WIDTH / 2,p3 + HEIGHT / 2},
+				{x + WIDTH / 2, p1 + HEIGHT / 2},
+				};
+				SDL_RenderDrawLines(renderer, points, 2);
+			}
+		}
+
+		//***************
+
+		//if (l1 >= l2 && l1 >= l3) {
+
+		//	if (p2 < -99999999 || p2 > 99999999) {
+		//		p2 = p1;
+		//	}
+		//	if (p3 < -99999999 || p3 > 99999999) {
+		//		p3 = p1;
+		//	}
+
+		//	SDL_Point points[2] = {
+		//	{x + WIDTH / 2,p2 + HEIGHT / 2},
+		//	{x + WIDTH / 2, p3 + HEIGHT / 2},
+		//	};
+		//	SDL_RenderDrawLines(renderer, points, 2);
+		//}
+		//else if (l2 >= l3 && l2 >= l1) {
+		//	if (p3 < -999999 || p3 > 999999) {
+		//		p3 = p2;
+		//	}
+		//	if (p1 < -999999 || p1 > 999999) {
+		//		p1 = p2;
+		//	}
+		//	SDL_Point points[2] = {
+		//	{x + WIDTH / 2,p3 + HEIGHT / 2},
+		//	{x + WIDTH / 2, p1 + HEIGHT / 2},
+		//	};
+		//	SDL_RenderDrawLines(renderer, points, 2);
+		//}
+		//else if (l3 >= l2 && l3 >= l1) {
+		//	if (p2 < -999999 || p2 > 999999) {
+		//		p2 = p3;
+		//	}
+		//	if (p1 < -999999 || p1 > 999999) {
+		//		p1 = p3;
+		//	}
+		//	SDL_Point points[2] = {
+		//	{x + WIDTH / 2,p2 + HEIGHT / 2},
+		//	{x + WIDTH / 2, p1 + HEIGHT / 2},
+		//	};
+		//	SDL_RenderDrawLines(renderer, points, 2);
+		//}
+	}
+
+	return;
+
+
+
+#pragma region old
+	float xS = longestEdge[0].x;
+	float xF = longestEdge[1].x;
+
+	if (longestEdge[0].x > longestEdge[1].x) {
+		xS = longestEdge[1].x;
+		xF = longestEdge[0].x;
+	}
+
+	for (float x = xS; x < xF; x++)
+	{
+
 		//Calculate the y for x
 		float y = -(a * x + c) / b;
 
@@ -249,16 +437,26 @@ void fillTriangle(vector<vec3d> vertices) {
 			s3 = -1;
 		}
 
-		for (float i = x; i < x2; i++)	
+
+		float xS2 = x;
+		float xF2 = thirdVertex.x;
+
+		if (x > thirdVertex.x) {
+			xS2 = thirdVertex.x;
+			xF2 = x;
+		}
+
+
+		for (float i = xS2; i < xF2; i++)
 		{
 			vec3d p;
 			p.x = i;
 			p.y = (aP * x + cP) / -bP;
-
+			SDL_RenderDrawPoint(renderer, p.x + WIDTH / 2, p.y + HEIGHT / 2);
 			//Fix <> signs
-			if ((a2 * p.x + b2 * p.y + c2)*s2 < 0 && (a3 * p.x + b3 * p.y + c3)*s3 < 0) {
+			if ((a2 * p.x + b2 * p.y + c2) * s2 < 0 && (a3 * p.x + b3 * p.y + c3) * s3 < 0) {
 
-				SDL_RenderDrawPoint(renderer, p.x + 320, p.y + 320);
+				SDL_RenderDrawPoint(renderer, p.x + WIDTH / 2, p.y + HEIGHT / 2);
 
 			}
 			else {
@@ -267,6 +465,8 @@ void fillTriangle(vector<vec3d> vertices) {
 		}
 
 	}
+#pragma endregion
+
 
 
 }
@@ -292,17 +492,21 @@ void drawTris(meshv m) {
 			int index = face.points[i];
 
 
+			//pos.push_back(m.verts[index].p);
 
 			for (auto v : m.vertices) {
 
 				if (v.id == index) {
+					//v.p.y = -v.p.y;
 					pos.push_back(v.p);
+					int t = 0;
+					break;
 				}
 
 			}
 
 		}
-
+		//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
 		fillTriangle(pos);
 
 		for (size_t i = 0; i < 3; i++) {
@@ -318,6 +522,7 @@ void drawTris(meshv m) {
 			{pos[i].x + WIDTH / 2,pos[i].y + HEIGHT / 2},
 			{pos[j].x + WIDTH / 2, pos[j].y + HEIGHT / 2},
 			};
+			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 
 			SDL_RenderDrawLines(renderer, points, 2);
 		}
@@ -452,18 +657,23 @@ int main(int argc, char* argv[])
 		}
 	);
 
-	//cubeV.addFace({ {0,1,2},{1,3,2},{4,5,6},
-	//	{5,7,6},{4,0,6},{6,0,2},
-	//	{4,5,0},{5,1,0},{1,5,3},
-	//	{3,5,7},{2,3,6},{3,7,6} });
+	//cubeV.addVertex({
+	//{-50.0f, 50.0f, z1}, {50.0f, 50.0f, z1}, {-50.0f, -50.0f, z1},
+	//	}
+	//);
+
+	cubeV.addFace({ {0,1,2},{1,3,2},{4,5,6},
+		{5,7,6},{4,0,6},{6,0,2},
+		{4,5,0},{5,1,0},{1,5,3},
+		{3,5,7},{2,3,6},{3,7,6} });
 
 
-	cubeV.addFace({ {0,1,2} });
+	//cubeV.addFace({ {0,1,2},{1,3,2},{4,5,6} });
 
 	//move(cubeV, { 100,100,25 });
 
 
-	//rotate(cubeV, { 1, 0, 0 }, 3.14159f / 4);
+	rotate(cubeV, { 1, 1, 1 }, 3.14159f * 110 / 250);
 	//
 
 #pragma endregion
@@ -473,13 +683,14 @@ int main(int argc, char* argv[])
 	// animation loop
 	while (!close) {
 
+		auto start = std::chrono::high_resolution_clock::now();
+
 		SDL_SetRenderDrawColor(renderer, 255 * 0.227, 255 * 0.227, 255 * 0.227, 255);
 		SDL_RenderClear(renderer);
 
 		SDL_Event event;
 
-
-		//rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
+		rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
 
 		drawTris(cubeV);
 
@@ -513,7 +724,7 @@ int main(int argc, char* argv[])
 					move(cubeV, { -10,0,0 });
 					break;
 				case SDL_SCANCODE_G:
-
+					rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
 					break;
 				default:
 					break;
@@ -524,9 +735,13 @@ int main(int argc, char* argv[])
 
 
 
+		auto end = std::chrono::high_resolution_clock::now();
 
+		// Calculate the duration
+		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
-
+		// Output the duration in milliseconds
+		//std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
 
 
 		SDL_RenderPresent(renderer);
