@@ -5,6 +5,7 @@
 #include <chrono>
 #include"methods.h"
 #include <map>
+#include <algorithm>
 
 using namespace std;
 
@@ -36,10 +37,28 @@ struct vertex {
 };
 struct face {
 	vector<int> points;
+	vector<vec3d> pos;
+	vec3d normal;
 };
 
 
 
+// Cross product
+vec3d cross(const vec3d& a, const vec3d& b) {
+	return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+}
+vec3d subVector(vec3d vec1, vec3d vec2) {
+	vec3d subbed;
+	subbed.x = vec1.x - vec2.x;
+	subbed.y = vec1.y - vec2.y;
+	subbed.z = vec1.z - vec2.z;
+
+	return subbed;
+}
+// Dot product
+float dot(const vec3d& a, const vec3d& b) {
+	return a.x * b.x + a.y * b.y + a.z * b.z;
+}
 
 struct meshv
 {
@@ -79,6 +98,23 @@ public:
 		{
 			face f;
 			f.points = facesA[i];
+			vector<vec3d> posV;
+			posV.push_back(verts[facesA[i][0]].p);
+			posV.push_back(verts[facesA[i][1]].p);
+			posV.push_back(verts[facesA[i][2]].p);
+
+			vec3d v1 = subVector(verts[facesA[i][1]].p, verts[facesA[i][0]].p);
+			vec3d v2 = subVector(verts[facesA[i][2]].p, verts[facesA[i][0]].p);
+
+			vec3d normal = cross(v1, v2);
+
+			verts[facesA[i][0]].normal = normal;
+			verts[facesA[i][1]].normal = normal;
+			verts[facesA[i][2]].normal = normal;
+
+			f.normal = normal;
+
+			f.pos = posV;
 			faces.push_back(f);
 		}
 	}
@@ -128,18 +164,29 @@ meshv& project(meshv& m) {
 		vert.p.y = (m.position.y + vert.p.y) * zRate;
 	}
 
+	//for (auto& face : m.faces) {
+	for (int j = 0; j < m.faces.size(); j++) {
+		for (size_t i = 0; i < 3; i++)
+		{
+			float z = m.position.z + m.faces[j].pos[0].z;
+
+			float zRate = z / (fFar - fNear);
+
+			//zRate = 1;
+
+			m.faces[j].pos[i].x = (m.position.x + m.faces[j].pos[i].x) * zRate;
+			m.faces[j].pos[i].y = (m.position.y + m.faces[j].pos[i].y) * zRate;
+
+		}
+
+	}
+	int t = 0;
+
 	return m;
 }
 
 
-vec3d subVector(vec3d vec1, vec3d vec2) {
-	vec3d subbed;
-	subbed.x = vec1.x - vec2.x;
-	subbed.y = vec1.y - vec2.y;
-	subbed.z = vec1.z - vec2.z;
 
-	return subbed;
-}
 
 bool fillTriangle2(vec3d p, vec3d a, vec3d b, vec3d c) {
 	// Compute vectors
@@ -472,27 +519,84 @@ void fillTriangle(vector<vec3d> vertices) {
 
 }
 
+//TODO: fix face-vertex
 void drawTris(meshv m) {
 
 
+	int t = 0;
 	project(m);
+	int t2 = 0;
 
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-
-
-	vector<vec3d> pos;
+	map<int, vec3d> f;
 
 	for (auto face : m.faces) {
 
-		int j;
-		pos.clear();
 
 		for (size_t i = 0; i < 3; i++)
 		{
 
 			int index = face.points[i];
 
+			for (auto v : m.vertices) {
 
+				if (v.id == index) {
+					f[index] = v.p;
+					int t = 0;
+					break;
+				}
+
+			}
+		}
+	}
+
+	for (auto& face : m.faces) {
+
+		face.pos[0] = f[face.points[0]];
+		face.pos[1] = f[face.points[1]];
+		face.pos[2] = f[face.points[2]];
+
+	}
+
+	sort(m.faces.begin(), m.faces.end(), [](face &f1, face &f2) {
+
+		float z1 = (f1.pos[0].z + f1.pos[1].z + f1.pos[2].z) / 3.0;
+		float z2 = (f2.pos[0].z + f2.pos[1].z + f2.pos[2].z) / 3.0;
+		return z1 < z2;
+	});
+
+
+	
+
+	//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+
+	vector<vec3d> pos;
+
+	for (auto face : m.faces) {
+
+		SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+
+		int j;
+		pos.clear();
+		vec3d abc = { 0,0,-1 };
+		//float d = dot(face.normal, abc);
+		float d = face.normal.z;
+
+		if (d < 0) {
+			continue;
+			SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+			int tt = 0;
+		}
+		if (face.normal.y > 0) {
+			SDL_SetRenderDrawColor(renderer, 0, 125, 125, 125);
+
+		}
+
+		for (size_t i = 0; i < 3; i++)
+		{
+
+			int index = face.points[i];
+
+			//m.verts[index].p;
 			//pos.push_back(m.verts[index].p);
 
 			for (auto v : m.vertices) {
@@ -507,8 +611,12 @@ void drawTris(meshv m) {
 			}
 
 		}
+
+
+
 		//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-		fillTriangle(pos);
+		fillTriangle(face.pos);
+		//fillTriangle(pos);
 
 		for (size_t i = 0; i < 3; i++) {
 			if (i != 2) {
@@ -519,9 +627,14 @@ void drawTris(meshv m) {
 			}
 
 
+			//SDL_Point points[2] = {
+			//{pos[i].x + WIDTH / 2,pos[i].y + HEIGHT / 2},
+			//{pos[j].x + WIDTH / 2, pos[j].y + HEIGHT / 2},
+			//};
+
 			SDL_Point points[2] = {
-			{pos[i].x + WIDTH / 2,pos[i].y + HEIGHT / 2},
-			{pos[j].x + WIDTH / 2, pos[j].y + HEIGHT / 2},
+			{face.pos[i].x + WIDTH / 2,face.pos[i].y + HEIGHT / 2},
+			{face.pos[j].x + WIDTH / 2, face.pos[j].y + HEIGHT / 2},
 			};
 			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 
@@ -533,15 +646,8 @@ void drawTris(meshv m) {
 }
 
 
-// Cross product
-vec3d cross(const vec3d& a, const vec3d& b) {
-	return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
-}
 
-// Dot product
-float dot(const vec3d& a, const vec3d& b) {
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
+
 
 vec3d multiplayVector(vec3d vec, float f) {
 	vec3d multiplied;
@@ -594,7 +700,8 @@ void move(meshv& m, vec3d v) {
 }
 
 void rotate(meshv& m, const vec3d& axis, float angle) {
-
+	meshv mP = m;
+	project(mP);
 	for (auto& vert : m.vertices) {
 
 		vec3d rotated = rotateAroundPoint(vert.p, m.position, axis, angle);
@@ -603,6 +710,15 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 		vert.p.y = rotated.y;
 		vert.p.z = rotated.z;
 	}
+	int t = 0;
+	for (auto& f : m.faces) {
+
+		vec3d v1 = subVector(mP.vertices[f.points[1]].p, mP.vertices[f.points[0]].p);
+		vec3d v2 = subVector(mP.vertices[f.points[2]].p, mP.vertices[f.points[0]].p);
+		vec3d normal = cross(v1, v2);
+		f.normal = normal;
+	}
+	int ta = 0;
 
 }
 
@@ -663,18 +779,19 @@ int main(int argc, char* argv[])
 	//	}
 	//);
 
-	cubeV.addFace({ {0,1,2},{1,3,2},{4,5,6},
-		{5,7,6},{4,0,6},{6,0,2},
+	//cubeV.addFace({ 
+	//	{3,5,7} });
+
+
+	cubeV.addFace({ {0,1,2},{1,3,2},{5,4,6},
+		{7,5,6},{4,0,6},{6,0,2},
 		{4,5,0},{5,1,0},{1,5,3},
 		{3,5,7},{2,3,6},{3,7,6} });
-
-
-	//cubeV.addFace({ {0,1,2},{1,3,2},{4,5,6} });
 
 	//move(cubeV, { 100,100,25 });
 
 
-	rotate(cubeV, { 1, 1, 1 }, 3.14159f * 110 / 250);
+	//rotate(cubeV, { 1, 1, 1 }, 3.14159f * 193 / 250);
 	//
 
 #pragma endregion
@@ -691,7 +808,7 @@ int main(int argc, char* argv[])
 
 		SDL_Event event;
 
-		rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
+		//rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
 
 		drawTris(cubeV);
 
