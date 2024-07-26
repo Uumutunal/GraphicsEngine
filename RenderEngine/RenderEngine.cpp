@@ -9,6 +9,7 @@
 #include <fstream>
 #include <strstream>
 
+
 using namespace std;
 
 struct pixel
@@ -16,12 +17,12 @@ struct pixel
 	float depth;
 };
 
-const int WIDTH = 640;
-const int HEIGHT = 640;
+const int WIDTH = 800;
+const int HEIGHT = 800;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
-vector<vector<pixel>> zBuffer(WIDTH, vector<pixel>(HEIGHT, { -std::numeric_limits<float>::infinity()}));
+vector<vector<pixel>> zBuffer(WIDTH, vector<pixel>(HEIGHT, { -std::numeric_limits<float>::infinity() }));
 
 void reinitializeZBuffer(std::vector<std::vector<pixel>>& zBuffer, int width, int height) {
 	for (int x = 0; x < width; ++x) {
@@ -93,28 +94,21 @@ void normalize(vec3d& v) {
 
 }
 
-void drawLine(SDL_Renderer *renderer, const SDL_Point *points, float depth ) {
+void drawLine(SDL_Renderer* renderer, const SDL_Point* points, float depth) {
 
-	if (points[0].y < points[1].y) {
+	int startX = points[0].x;
+	int endX = points[0].x + 1;
+	int startY = points[0].y;
+	int endY = points[1].y;
 
-		for (size_t j = points[0].x-1; j < points[0].x + 2; j++)
-		{
-			for (size_t i = points[0].y; i < points[1].y+1; i++)
-			{
-				if (zBuffer[i][j].depth < depth) {
-					SDL_RenderDrawPoint(renderer, j, i);
-					zBuffer[i][j].depth = depth;
-				}
-				
-			}
-		}
-
+	if (startY > endY) {
+		std::swap(startY, endY);
 	}
-	else {
-		for (size_t j = points[0].x - 1; j < points[0].x + 2; j++)
-		{
-			for (size_t i = points[0].y; i > points[1].y-1; i--)
-			{
+
+	for (int j = startX - 1; j <= endX; j++) {
+		for (int i = startY; i <= endY; i++) {
+			// Boundary checks
+			if (i >= 0 && i < HEIGHT && j >= 0 && j < WIDTH) {
 				if (zBuffer[i][j].depth < depth) {
 					SDL_RenderDrawPoint(renderer, j, i);
 					zBuffer[i][j].depth = depth;
@@ -462,6 +456,7 @@ void fillTriangle(vector<vec3d> vertices) {
 		float p2 = (-a2 * x - c2) / b2;
 		float p3 = (-a3 * x - c3) / b3;
 
+
 		if (b == 0) {
 			SDL_Point points[2] = {
 			{x + WIDTH / 2,p2 + HEIGHT / 2},
@@ -502,7 +497,6 @@ void fillTriangle(vector<vec3d> vertices) {
 		A = bot.y - top.y;
 		B = (top.x - bot.x);
 		C = (bot.x * top.y) - (top.x * bot.y);
-
 
 		if (abs(A * x + B * p1 + C) <= 0.01) {
 			float lH1 = abs(p1 - p2);
@@ -578,134 +572,9 @@ void fillTriangle(vector<vec3d> vertices) {
 
 			}
 		}
-
-		//***************
-
-		//if (l1 >= l2 && l1 >= l3) {
-
-		//	if (p2 < -99999999 || p2 > 99999999) {
-		//		p2 = p1;
-		//	}
-		//	if (p3 < -99999999 || p3 > 99999999) {
-		//		p3 = p1;
-		//	}
-
-		//	SDL_Point points[2] = {
-		//	{x + WIDTH / 2,p2 + HEIGHT / 2},
-		//	{x + WIDTH / 2, p3 + HEIGHT / 2},
-		//	};
-		//	SDL_RenderDrawLines(renderer, points, 2);
-		//}
-		//else if (l2 >= l3 && l2 >= l1) {
-		//	if (p3 < -999999 || p3 > 999999) {
-		//		p3 = p2;
-		//	}
-		//	if (p1 < -999999 || p1 > 999999) {
-		//		p1 = p2;
-		//	}
-		//	SDL_Point points[2] = {
-		//	{x + WIDTH / 2,p3 + HEIGHT / 2},
-		//	{x + WIDTH / 2, p1 + HEIGHT / 2},
-		//	};
-		//	SDL_RenderDrawLines(renderer, points, 2);
-		//}
-		//else if (l3 >= l2 && l3 >= l1) {
-		//	if (p2 < -999999 || p2 > 999999) {
-		//		p2 = p3;
-		//	}
-		//	if (p1 < -999999 || p1 > 999999) {
-		//		p1 = p3;
-		//	}
-		//	SDL_Point points[2] = {
-		//	{x + WIDTH / 2,p2 + HEIGHT / 2},
-		//	{x + WIDTH / 2, p1 + HEIGHT / 2},
-		//	};
-		//	SDL_RenderDrawLines(renderer, points, 2);
-		//}
 	}
 
 	return;
-
-
-
-#pragma region old
-	float xS = longestEdge[0].x;
-	float xF = longestEdge[1].x;
-
-	if (longestEdge[0].x > longestEdge[1].x) {
-		xS = longestEdge[1].x;
-		xF = longestEdge[0].x;
-	}
-
-	for (float x = xS; x < xF; x++)
-	{
-
-		//Calculate the y for x
-		float y = -(a * x + c) / b;
-
-		//Calculate perpendicular line
-		float aP = -b;
-		float bP = a;
-
-		float cP = -(aP * x + bP * y);
-
-
-		//Find intersection point
-		float determinant = a * bP - aP * b;
-
-		float x2 = (b * cP - bP * d) / determinant;
-		float y2 = (aP * d - a * cP) / determinant;
-
-		int sign2 = (a2 * longestEdge[0].x + b2 * longestEdge[0].y + c2);
-
-		int sign3 = (a3 * longestEdge[1].x + b3 * longestEdge[1].y + c3);
-
-		int s2;
-		int s3;
-
-		if (sign2 < 0) {
-			s2 = 1;
-		}
-		else {
-			s2 = -1;
-		}
-
-		if (sign3 < 0) {
-			s3 = 1;
-		}
-		else {
-			s3 = -1;
-		}
-
-
-		float xS2 = x;
-		float xF2 = thirdVertex.x;
-
-		if (x > thirdVertex.x) {
-			xS2 = thirdVertex.x;
-			xF2 = x;
-		}
-
-
-		for (float i = xS2; i < xF2; i++)
-		{
-			vec3d p;
-			p.x = i;
-			p.y = (aP * x + cP) / -bP;
-			SDL_RenderDrawPoint(renderer, p.x + WIDTH / 2, p.y + HEIGHT / 2);
-			//Fix <> signs
-			if ((a2 * p.x + b2 * p.y + c2) * s2 < 0 && (a3 * p.x + b3 * p.y + c3) * s3 < 0) {
-
-				SDL_RenderDrawPoint(renderer, p.x + WIDTH / 2, p.y + HEIGHT / 2);
-
-			}
-			else {
-				break;
-			}
-		}
-
-	}
-#pragma endregion
 
 }
 
@@ -786,7 +655,7 @@ void drawTris(meshv& m) {
 			{m.verticesProjected[face.points[i]].p.x + WIDTH / 2,m.verticesProjected[face.points[i]].p.y + HEIGHT / 2},
 			{m.verticesProjected[face.points[j]].p.x + WIDTH / 2, m.verticesProjected[face.points[j]].p.y + HEIGHT / 2},
 			};
-			//SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+			SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
 			//SDL_RenderDrawLines(renderer, points, 2);
 		}
@@ -824,8 +693,8 @@ vec3d addVector(vec3d vec1, vec3d vec2) {
 vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& axis, float angle) {
 	// Translate point to origin
 	vec3d center;
-	center.x = mCenter.x;
-	center.y = mCenter.y;
+	center.x = 0;
+	center.y = 0;
 	center.z = 0;
 
 	vec3d p = { point.x - center.x, point.y - center.y, point.z - center.z };
@@ -846,9 +715,13 @@ vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& ax
 }
 
 void move(meshv& m, vec3d v) {
+
+
 	m.position.x += v.x;
 	m.position.y += v.y;
 	m.position.z += v.z;
+
+
 }
 
 void rotate(meshv& m, const vec3d& axis, float angle) {
@@ -887,8 +760,8 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 		//m.verticesProjected[i].p.y = rotated.y;
 		//m.verticesProjected[i].p.z = rotated.z;
 
-		//m.verticesProjected[i].p.x = m.vertices[i].p.x;
-		//m.verticesProjected[i].p.y = m.vertices[i].p.y;
+		m.verticesProjected[i].p.x = m.vertices[i].p.x;
+		m.verticesProjected[i].p.y = m.vertices[i].p.y;
 		m.verticesProjected[i].p.z = m.vertices[i].p.z;
 
 	}
@@ -903,8 +776,8 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 		//	m.vertices[f.points[i]].p.z = rotated.z;
 		//}
 
-		vec3d v1 = subVector(m.vertices[f.points[1]].p, m.vertices[f.points[0]].p);
-		vec3d v2 = subVector(m.vertices[f.points[2]].p, m.vertices[f.points[0]].p);
+		vec3d v1 = subVector(m.verticesProjected[f.points[1]].p, m.verticesProjected[f.points[0]].p);
+		vec3d v2 = subVector(m.verticesProjected[f.points[2]].p, m.verticesProjected[f.points[0]].p);
 
 		vec3d normal = cross(v1, v2);
 
@@ -996,6 +869,15 @@ int main(int argc, char* argv[])
 #pragma endregion
 
 
+	int mouseX = 0;
+	int mouseY = 0;
+	bool gPressed = false;
+	bool rPressed = false;
+
+
+
+	//meshv& renderedMesh = cubeV;
+	meshv& renderedMesh = importM;
 
 	// animation loop
 	while (!close) {
@@ -1009,12 +891,11 @@ int main(int argc, char* argv[])
 
 		SDL_Event event;
 
-		//drawTris(cubeV);
-		drawTris(importM);
+		drawTris(renderedMesh);
+		//drawTris(importM);
 
-		//rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
-		rotate(importM, { 0, 1, 0 }, 3.14159f / 50);
-
+		//rotate(renderedMesh, { 1, 1, 1 }, 3.14159f / 250);
+		//rotate(importM, { 0, 1, 0 }, 3.14159f / 50);
 
 
 
@@ -1031,30 +912,110 @@ int main(int argc, char* argv[])
 				switch (event.key.keysym.scancode) {
 				case SDL_SCANCODE_W:
 				case SDL_SCANCODE_UP:
-					move(cubeV, { 0,10,0 });
+					move(renderedMesh, { 0,10,0 });
 					//dest.y -= speed / 30;
 					break;
 				case SDL_SCANCODE_A:
 				case SDL_SCANCODE_LEFT:
-					move(importM, { 10,0,0 });
+					move(renderedMesh, { 10,0,0 });
 					break;
 				case SDL_SCANCODE_S:
 				case SDL_SCANCODE_DOWN:
-					move(cubeV, { 0,-10,0 });
+					move(renderedMesh, { 0,-10,0 });
 					break;
 				case SDL_SCANCODE_D:
 				case SDL_SCANCODE_RIGHT:
-					move(importM, { -10,0,0 });
+					move(renderedMesh, { -10,0,0 });
 					break;
+
 				case SDL_SCANCODE_G:
-					rotate(importM, { 0, 1, 0 }, 3.14159f / 250);
+					if (!gPressed) {
+						gPressed = true;
+						SDL_GetMouseState(&mouseX, &mouseY);
+					}
+					cout << "G" << endl;
+					//rotate(cubeV, { 0, 1, 0 }, 3.14159f / 250);
+
+					break;
+
+				case SDL_SCANCODE_R:
+					if (!rPressed) {
+						rPressed = true;
+						SDL_GetMouseState(&mouseX, &mouseY);
+					}
+					cout << "R" << endl;
+
+					break;
+				case SDL_SCANCODE_ESCAPE:
+					gPressed = false;
+					rPressed = false;
 					break;
 				default:
 					break;
 				}
+				break;
+
+			case SDL_KEYUP:
+
+				switch (event.key.keysym.scancode) {
+
+				case SDL_SCANCODE_G:
+					cout << "G up" << endl;
+					break;
+				case SDL_SCANCODE_R:
+					cout << "R up" << endl;
+					break;
+				}
+
+				break;
 			}
 
 		}
+
+
+		if (gPressed) {
+			int x = 0;
+			int y = 0;
+			SDL_GetMouseState(&x, &y);
+
+			float z = renderedMesh.position.z;
+			float zRate = z / (fFar - fNear);
+
+			vec3d moveDir = { (mouseX - x) / -zRate , (mouseY - y) / -zRate, 0 };
+			mouseX = x;
+			mouseY = y;
+			move(renderedMesh, moveDir);
+
+		}
+
+		if (rPressed) {
+			int x = 0;
+			int y = 0;
+			SDL_GetMouseState(&x, &y);
+
+			float z = renderedMesh.position.z;
+			float zRate = z / (fFar - fNear);
+
+			vec3d moveDir = { (mouseX - x) / -zRate , (mouseY - y) / -zRate, 0 };
+			mouseX = x;
+			mouseY = y;
+
+			rotate(renderedMesh, { 0,1,0 }, 3.14 * (moveDir.x) / 50);
+			//rotate(renderedMesh, { 0,0,1 }, 3.14 * (moveDir.y) / 50);
+
+			//rotate(renderedMesh, { 0,1,0 }, 3.14 / 50);
+		}
+
+		if (SDL_GetMouseState(NULL, NULL) == 1) {
+			gPressed = false;
+			rPressed = false;
+			cout << "mouse down" << endl;
+		}
+
+
+
+
+
 		SDL_SetRenderDrawColor(renderer, 255 * 1, 255 * 1, 255 * 1, 255);
 
 		//SDL_RenderDrawPoint(renderer, 0+a, 0+a);
@@ -1065,8 +1026,13 @@ int main(int argc, char* argv[])
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 		//rotate(importM, { 0, 1, 0 }, 3.14159f * duration.count() / 4000);
 		// Output the duration in milliseconds
-		std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
+		//std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
 
+		int x = 0;
+		int y = 0;
+		SDL_GetMouseState(&x, &y);
+
+		//cout << y << endl;
 
 		SDL_RenderPresent(renderer);
 
