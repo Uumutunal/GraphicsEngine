@@ -134,9 +134,10 @@ public:
 
 	vector<face> faces;
 
-	vec3d origin;
+	vec3d cameraPos;
 
 	vec3d position;
+
 
 	void addVertex(vector<vertex> verticesA) {
 		for (size_t i = 0; i < verticesA.size(); i++)
@@ -185,6 +186,10 @@ public:
 
 
 
+struct camera {
+	vec3d position = { 0,0,0 };
+	vec3d rotation = { 0,0,0 };
+};
 
 
 bool importMesh(string sFilename, meshv& importedMesh) {
@@ -585,34 +590,7 @@ void drawTris(meshv& m) {
 	project(m);
 
 
-	//for (auto& face : m.faces) {
-
-	//	face.pos[0] = m.verticesProjected[face.points[0]].p;
-	//	face.pos[1] = m.verticesProjected[face.points[1]].p;
-	//	face.pos[2] = m.verticesProjected[face.points[2]].p;
-
-	//}
-
-
-
-	//sort(m.faces.begin(), m.faces.end(), [](face& f1, face& f2) {
-
-	//	float z1 = (f1.pos[0].z + f1.pos[1].z + f1.pos[2].z) / 3.0;
-	//	float z2 = (f2.pos[0].z + f2.pos[1].z + f2.pos[2].z) / 3.0;
-
-	//	//z1 = (m.verticesProjected[f1.points[0]].p.z + m.verticesProjected[f1.points[1]].p.z + m.verticesProjected[f1.points[2]].p.z);
-	//	//z1 = (m.verticesProjected[f2.points[0]].p.z + m.verticesProjected[f2.points[1]].p.z + m.verticesProjected[f2.points[2]].p.z);
-
-	//	return z1 < z2;
-	//	});
-
-
-
-	//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-
-	//vector<vec3d> pos;
-
-	for (auto face : m.faces) {
+	for (auto& face : m.faces) {
 
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 
@@ -690,12 +668,20 @@ vec3d addVector(vec3d vec1, vec3d vec2) {
 
 
 // Rotate point around an axis
-vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& axis, float angle) {
+vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& axis, float angle, bool camera) {
 	// Translate point to origin
 	vec3d center;
-	center.x = 0;
-	center.y = 0;
-	center.z = 0;
+
+	if (camera) {
+		center = mCenter;
+	}
+	else {
+		center.x = 0;
+		center.y = 0;
+		center.z = 0;
+	}
+
+
 
 	vec3d p = { point.x - center.x, point.y - center.y, point.z - center.z };
 
@@ -745,7 +731,7 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 
 	for (size_t i = 0; i < m.vertices.size(); i++)
 	{
-		vec3d rotated = rotateAroundPoint(m.vertices[i].p, m.position, axis, angle);
+		vec3d rotated = rotateAroundPoint(m.vertices[i].p, m.position, axis, angle, false);
 
 
 		if (m.vertices[i].id == 1840) {
@@ -791,7 +777,43 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 
 }
 
+void rotateCamera(meshv& m, camera cam, const vec3d& axis, float angle) {
+	for (size_t i = 0; i < m.vertices.size(); i++)
+	{
+		vec3d focus = { 0,0,500 };
 
+		vec3d rotated = rotateAroundPoint(m.vertices[i].p, cam.position, axis, angle, true);
+
+
+		if (m.vertices[i].id == 1840) {
+			int a = 0;
+		}
+
+		m.vertices[i].p.x = rotated.x;
+		m.vertices[i].p.y = rotated.y;
+		m.vertices[i].p.z = rotated.z;
+
+
+		m.verticesProjected[i].p.x = m.vertices[i].p.x;
+		m.verticesProjected[i].p.y = m.vertices[i].p.y;
+		m.verticesProjected[i].p.z = m.vertices[i].p.z;
+
+	}
+
+	for (auto& f : m.faces) {
+
+		vec3d v1 = subVector(m.verticesProjected[f.points[1]].p, m.verticesProjected[f.points[0]].p);
+		vec3d v2 = subVector(m.verticesProjected[f.points[2]].p, m.verticesProjected[f.points[0]].p);
+
+		vec3d normal = cross(v1, v2);
+
+
+		normalize(normal);
+		f.normal = normal;
+
+
+	}
+}
 
 
 
@@ -803,7 +825,7 @@ int main(int argc, char* argv[])
 	window = SDL_CreateWindow("Graphics Engine", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 
-
+	camera mainCamera;
 
 	int close = 0;
 
@@ -873,6 +895,7 @@ int main(int argc, char* argv[])
 	int mouseY = 0;
 	bool gPressed = false;
 	bool rPressed = false;
+	bool shiftPressed = false;
 
 
 
@@ -950,6 +973,11 @@ int main(int argc, char* argv[])
 					gPressed = false;
 					rPressed = false;
 					break;
+				case SDL_SCANCODE_LSHIFT:
+				case SDL_SCANCODE_RSHIFT:
+					std::cout << "Shift key down" << std::endl;
+					shiftPressed = true;
+					break;
 				default:
 					break;
 				}
@@ -965,14 +993,42 @@ int main(int argc, char* argv[])
 				case SDL_SCANCODE_R:
 					cout << "R up" << endl;
 					break;
+				case SDL_SCANCODE_LSHIFT:
+				case SDL_SCANCODE_RSHIFT:
+					std::cout << "Shift key up" << std::endl;
+					shiftPressed = false;
+					break;
 				}
 
 				break;
+
+			case SDL_MOUSEWHEEL:
+				cout << "mouse wheel " << event.wheel.y << endl;
+
+				vec3d moveDir = { 0,0,30 * event.wheel.y };
+
+				move(renderedMesh, moveDir);
+				break;
+
 			}
 
+			
+			switch (event.type) {
+			case SDL_MOUSEBUTTONDOWN:
+				cout << "mouse wheel down" << endl;
+				SDL_GetMouseState(&mouseX, &mouseY);
+				break;
+
+			case SDL_MOUSEBUTTONUP:
+				cout << "mouse wheel up" << endl;
+				break;
+			}
+
+			if (event.type == SDL_MOUSEBUTTONDOWN) {
+			}
 		}
 
-
+		//Move
 		if (gPressed) {
 			int x = 0;
 			int y = 0;
@@ -988,6 +1044,7 @@ int main(int argc, char* argv[])
 
 		}
 
+		//Rotate
 		if (rPressed) {
 			int x = 0;
 			int y = 0;
@@ -1012,9 +1069,46 @@ int main(int argc, char* argv[])
 			cout << "mouse down" << endl;
 		}
 
+		//Pan camera
+		if (SDL_GetMouseState(NULL, NULL) == 2 && shiftPressed) {
+			int x = 0;
+			int y = 0;
+			SDL_GetMouseState(&x, &y);
 
+			float z = renderedMesh.position.z;
+			float zRate = z / (fFar - fNear);
 
+			vec3d moveDir = { (mouseX - x) / -zRate , (mouseY - y) / -zRate, 0 };
+			mouseX = x;
+			mouseY = y;
 
+			mainCamera.position = moveDir;
+
+			move(renderedMesh, moveDir);
+			
+			//cout << "wheel pressed" << endl;
+		}
+
+		//Rotate camera
+		if (SDL_GetMouseState(NULL, NULL) == 2) {
+			int x = 0;
+			int y = 0;
+			SDL_GetMouseState(&x, &y);
+
+			float z = renderedMesh.position.z;
+			float zRate = z / (fFar - fNear);
+
+			vec3d moveDir = { (mouseX - x) / -zRate , (mouseY - y) / -zRate, 0 };
+			mouseX = x;
+			mouseY = y;
+
+			mainCamera.position = moveDir;
+
+			rotateCamera(renderedMesh, mainCamera, { 0,1,0 }, 3.14 * (moveDir.x) / 50);
+			rotateCamera(renderedMesh, mainCamera, { 1,0,0 }, -3.14 * (moveDir.y) / 50);
+			
+			//cout << "wheel pressed" << endl;
+		}
 
 		SDL_SetRenderDrawColor(renderer, 255 * 1, 255 * 1, 255 * 1, 255);
 
