@@ -6,17 +6,36 @@
 #include"methods.h"
 #include <map>
 #include <algorithm>
+#include <fstream>
+#include <strstream>
 
 using namespace std;
+
+struct pixel
+{
+	float depth;
+};
 
 const int WIDTH = 640;
 const int HEIGHT = 640;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
+vector<vector<pixel>> zBuffer(WIDTH, vector<pixel>(HEIGHT, { -std::numeric_limits<float>::infinity()}));
+
+void reinitializeZBuffer(std::vector<std::vector<pixel>>& zBuffer, int width, int height) {
+	for (int x = 0; x < width; ++x) {
+		for (int y = 0; y < height; ++y) {
+			zBuffer[x][y].depth = -std::numeric_limits<float>::infinity();
+		}
+	}
+}
+
 
 float fNear = 300;
 float fFar = 0;
+
+
 
 struct vec2d
 {
@@ -47,7 +66,7 @@ struct face {
 vec3d cross(const vec3d& a, const vec3d& b) {
 	return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
 }
-vec3d subVector(vec3d vec1, vec3d vec2) {
+vec3d subVector(const vec3d& vec1, const vec3d& vec2) {
 	vec3d subbed;
 	subbed.x = vec1.x - vec2.x;
 	subbed.y = vec1.y - vec2.y;
@@ -60,6 +79,52 @@ float dot(const vec3d& a, const vec3d& b) {
 	return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+void normalize(vec3d& v) {
+
+	float length = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+
+	if (length == 0) {
+		return;
+	}
+
+	v.x /= length;
+	v.y /= length;
+	v.z /= length;
+
+}
+
+void drawLine(SDL_Renderer *renderer, const SDL_Point *points, float depth ) {
+
+	if (points[0].y < points[1].y) {
+
+		for (size_t j = points[0].x-1; j < points[0].x + 2; j++)
+		{
+			for (size_t i = points[0].y; i < points[1].y+1; i++)
+			{
+				if (zBuffer[i][j].depth < depth) {
+					SDL_RenderDrawPoint(renderer, j, i);
+					zBuffer[i][j].depth = depth;
+				}
+				
+			}
+		}
+
+	}
+	else {
+		for (size_t j = points[0].x - 1; j < points[0].x + 2; j++)
+		{
+			for (size_t i = points[0].y; i > points[1].y-1; i--)
+			{
+				if (zBuffer[i][j].depth < depth) {
+					SDL_RenderDrawPoint(renderer, j, i);
+					zBuffer[i][j].depth = depth;
+				}
+			}
+		}
+	}
+
+}
+
 struct meshv
 {
 
@@ -69,6 +134,7 @@ private:
 
 public:
 	vector<vertex> vertices;
+	vector<vertex> verticesProjected;
 
 	map<int, vertex> verts;
 
@@ -85,7 +151,7 @@ public:
 			v.p = verticesA[i].p;
 			v.id = index;
 			vertices.push_back(v);
-
+			verticesProjected.push_back(v);
 			verts[index] = verticesA[i];
 
 			index++;
@@ -108,6 +174,8 @@ public:
 
 			vec3d normal = cross(v1, v2);
 
+			normalize(normal);
+
 			verts[facesA[i][0]].normal = normal;
 			verts[facesA[i][1]].normal = normal;
 			verts[facesA[i][2]].normal = normal;
@@ -120,6 +188,89 @@ public:
 	}
 
 };
+
+
+
+
+
+bool importMesh(string sFilename, meshv& importedMesh) {
+
+	//meshv importedMesh;
+
+
+	ifstream f(sFilename);
+	if (!f.is_open())
+		return false;
+
+	// Local cache of verts
+	vector<vertex> verts;
+	vector<vec3d> vertsP;
+	vector<face> faces;
+	map<int, vertex> vv;
+
+	vector<vector<int>> facesA;
+
+	int index = 0;
+	while (!f.eof())
+	{
+		char line[128];
+		f.getline(line, 128);
+
+		strstream s;
+		s << line;
+
+		char junk;
+
+		if (line[0] == 'v')
+		{
+			vertex vert;
+			vec3d v;
+			s >> junk >> v.x >> v.y >> v.z;
+			vert.p = v;
+			vert.id = index;
+			verts.push_back(vert);
+			vertsP.push_back(v);
+			vv[index] = vert;
+			index++;
+		}
+
+		if (line[0] == 'f')
+		{
+			face ff;
+
+			int f[3];
+			s >> junk >> f[0] >> f[1] >> f[2];
+
+			ff.points.push_back(f[2] - 1);
+			ff.points.push_back(f[1] - 1);
+			ff.points.push_back(f[0] - 1);
+
+			facesA.push_back(ff.points);
+
+			ff.pos.push_back(vertsP[f[2] - 1]);
+			ff.pos.push_back(vertsP[f[1] - 1]);
+			ff.pos.push_back(vertsP[f[0] - 1]);
+
+			vec3d v1 = subVector(vertsP[f[1] - 1], vertsP[f[0] - 1]);
+			vec3d v2 = subVector(vertsP[f[2] - 1], vertsP[f[0] - 1]);
+			vec3d normal = cross(v1, v2);
+			normalize(normal);
+			ff.normal = normal;
+
+			faces.push_back(ff);
+		}
+	}
+
+	importedMesh.addVertex(verts);
+	importedMesh.addFace(facesA);
+
+	importedMesh.position = { 0,0,500 };
+
+	return true;
+}
+
+
+
 
 
 void drawTris(float tri[][2]) {
@@ -150,39 +301,56 @@ void drawTris(float tri[][2]) {
 
 
 
-meshv& project(meshv& m) {
+void project(meshv& m) {
 
-	for (auto& vert : m.vertices) {
+	//for (auto& vert : m.vertices) {
 
-		float z = m.position.z + vert.p.z;
+	//	float z = m.position.z + vert.p.z;
+
+	//	float zRate = z / (fFar - fNear);
+
+	//	//zRate = 1;
+
+	//	vert.p.x = (m.position.x + vert.p.x) * zRate;
+	//	vert.p.y = (m.position.y + vert.p.y) * zRate;
+	//}
+	for (size_t i = 0; i < m.vertices.size(); i++)
+	{
+		float z = m.position.z + m.vertices[i].p.z;
 
 		float zRate = z / (fFar - fNear);
 
-		//zRate = 1;
 
-		vert.p.x = (m.position.x + vert.p.x) * zRate;
-		vert.p.y = (m.position.y + vert.p.y) * zRate;
+		m.verticesProjected[i].p.x = (m.position.x + m.vertices[i].p.x) * zRate;
+		m.verticesProjected[i].p.y = (m.position.y + m.vertices[i].p.y) * zRate;
 	}
 
+	//TODO: check this
 	//for (auto& face : m.faces) {
-	for (int j = 0; j < m.faces.size(); j++) {
-		for (size_t i = 0; i < 3; i++)
-		{
-			float z = m.position.z + m.faces[j].pos[0].z;
+	//for (int j = 0; j < m.faces.size(); j++) {
+	//	for (size_t i = 0; i < 3; i++)
+	//	{
+	//		float z = m.position.z + m.faces[j].pos[0].z;
 
-			float zRate = z / (fFar - fNear);
+	//		float zRate = z / (fFar - fNear);
 
-			//zRate = 1;
+	//		//zRate = 1;
 
-			m.faces[j].pos[i].x = (m.position.x + m.faces[j].pos[i].x) * zRate;
-			m.faces[j].pos[i].y = (m.position.y + m.faces[j].pos[i].y) * zRate;
+	//		m.faces[j].pos[i].x = (m.position.x + m.faces[j].pos[i].x) * zRate;
+	//		m.faces[j].pos[i].y = (m.position.y + m.faces[j].pos[i].y) * zRate;
+	//	}
+	//}
 
-		}
+	for (auto& f : m.faces) {
 
+		vec3d v1 = subVector(m.vertices[f.points[1]].p, m.vertices[f.points[0]].p);
+		vec3d v2 = subVector(m.vertices[f.points[2]].p, m.vertices[f.points[0]].p);
+		vec3d normal = cross(v1, v2);
+		normalize(normal);
+		f.normal = normal;
 	}
 	int t = 0;
 
-	return m;
 }
 
 
@@ -217,7 +385,6 @@ void fillTriangle(vector<vec3d> vertices) {
 		return;
 	}
 
-
 	vec3d top;
 	vec3d bot;
 
@@ -237,7 +404,7 @@ void fillTriangle(vector<vec3d> vertices) {
 
 	}
 
-
+	float depth = (vertices[0].z + vertices[1].z + vertices[2].z) / 3.0;
 
 	vertices.push_back(vertices[0]);
 	vertices.push_back(vertices[1]);
@@ -295,6 +462,34 @@ void fillTriangle(vector<vec3d> vertices) {
 		float p2 = (-a2 * x - c2) / b2;
 		float p3 = (-a3 * x - c3) / b3;
 
+		if (b == 0) {
+			SDL_Point points[2] = {
+			{x + WIDTH / 2,p2 + HEIGHT / 2},
+			{x + WIDTH / 2, p3 + HEIGHT / 2},
+			};
+			//SDL_RenderDrawLines(renderer, points, 2);
+			drawLine(renderer, points, depth);
+			continue;
+		}
+		else if (b2 == 0) {
+			SDL_Point points[2] = {
+			{x + WIDTH / 2,p1 + HEIGHT / 2},
+			{x + WIDTH / 2, p3 + HEIGHT / 2},
+			};
+			//SDL_RenderDrawLines(renderer, points, 2);
+			drawLine(renderer, points, depth);
+			continue;
+		}
+		else if (b3 == 0) {
+			SDL_Point points[2] = {
+			{x + WIDTH / 2,p2 + HEIGHT / 2},
+			{x + WIDTH / 2, p1 + HEIGHT / 2},
+			};
+			//SDL_RenderDrawLines(renderer, points, 2);
+			drawLine(renderer, points, depth);
+			continue;
+		}
+
 
 		float l1 = (top.x - x) * (top.x - x) + (top.y - p1) * (top.y - p1);
 		float l2 = (top.x - x) * (top.x - x) + (top.y - p2) * (top.y - p2);
@@ -304,21 +499,6 @@ void fillTriangle(vector<vec3d> vertices) {
 		float B;
 		float C;
 
-		if ((a * top.x + b * top.y + c) == 0 && (a * bot.x + b * bot.y + c) == 0) {
-			A = a;
-			B = b;
-			C = c;
-		}
-		else if ((a2 * top.x + b2 * top.y + c2) == 0 && (a2 * bot.x + b2 * bot.y + c2) == 0) {
-			A = a2;
-			B = b2;
-			C = c2;
-		}
-		else if ((a3 * top.x + b3 * top.y + c3) == 0 && (a3 * bot.x + b3 * bot.y + c3) == 0) {
-			A = a3;
-			B = b3;
-			C = c3;
-		}
 		A = bot.y - top.y;
 		B = (top.x - bot.x);
 		C = (bot.x * top.y) - (top.x * bot.y);
@@ -334,18 +514,23 @@ void fillTriangle(vector<vec3d> vertices) {
 				{x + WIDTH / 2,p1 + HEIGHT / 2},
 				{x + WIDTH / 2, p2 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+
+
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
 			}
 			else {
 				SDL_Point points[2] = {
 				{x + WIDTH / 2,p1 + HEIGHT / 2},
 				{x + WIDTH / 2, p3 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
+
 			}
 
 		}
-		if (abs(A * x + B * p2 + C) <= 0.01) {
+		else if (abs(A * x + B * p2 + C) <= 0.01) {
 			float lH1 = abs(p2 - p1);
 			float lH2 = abs(p2 - p3);
 
@@ -355,17 +540,21 @@ void fillTriangle(vector<vec3d> vertices) {
 				{x + WIDTH / 2,p2 + HEIGHT / 2},
 				{x + WIDTH / 2, p1 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
+
 			}
 			else {
 				SDL_Point points[2] = {
 				{x + WIDTH / 2,p2 + HEIGHT / 2},
 				{x + WIDTH / 2, p3 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
+
 			}
 		}
-		if (abs(A * x + B * p3 + C) <= 0.01) {
+		else if (abs(A * x + B * p3 + C) <= 0.01) {
 			float lH1 = abs(p3 - p2);
 			float lH2 = abs(p3 - p1);
 
@@ -375,14 +564,18 @@ void fillTriangle(vector<vec3d> vertices) {
 				{x + WIDTH / 2,p3 + HEIGHT / 2},
 				{x + WIDTH / 2, p2 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
+
 			}
 			else {
 				SDL_Point points[2] = {
 				{x + WIDTH / 2,p3 + HEIGHT / 2},
 				{x + WIDTH / 2, p1 + HEIGHT / 2},
 				};
-				SDL_RenderDrawLines(renderer, points, 2);
+				//SDL_RenderDrawLines(renderer, points, 2);
+				drawLine(renderer, points, depth);
+
 			}
 		}
 
@@ -514,109 +707,72 @@ void fillTriangle(vector<vec3d> vertices) {
 	}
 #pragma endregion
 
-
-
-
 }
 
-//TODO: fix face-vertex
-void drawTris(meshv m) {
+
+void drawTris(meshv& m) {
 
 
-	int t = 0;
 	project(m);
-	int t2 = 0;
-
-	map<int, vec3d> f;
-
-	for (auto face : m.faces) {
 
 
-		for (size_t i = 0; i < 3; i++)
-		{
+	//for (auto& face : m.faces) {
 
-			int index = face.points[i];
+	//	face.pos[0] = m.verticesProjected[face.points[0]].p;
+	//	face.pos[1] = m.verticesProjected[face.points[1]].p;
+	//	face.pos[2] = m.verticesProjected[face.points[2]].p;
 
-			for (auto v : m.vertices) {
-
-				if (v.id == index) {
-					f[index] = v.p;
-					int t = 0;
-					break;
-				}
-
-			}
-		}
-	}
-
-	for (auto& face : m.faces) {
-
-		face.pos[0] = f[face.points[0]];
-		face.pos[1] = f[face.points[1]];
-		face.pos[2] = f[face.points[2]];
-
-	}
-
-	sort(m.faces.begin(), m.faces.end(), [](face &f1, face &f2) {
-
-		float z1 = (f1.pos[0].z + f1.pos[1].z + f1.pos[2].z) / 3.0;
-		float z2 = (f2.pos[0].z + f2.pos[1].z + f2.pos[2].z) / 3.0;
-		return z1 < z2;
-	});
+	//}
 
 
-	
+
+	//sort(m.faces.begin(), m.faces.end(), [](face& f1, face& f2) {
+
+	//	float z1 = (f1.pos[0].z + f1.pos[1].z + f1.pos[2].z) / 3.0;
+	//	float z2 = (f2.pos[0].z + f2.pos[1].z + f2.pos[2].z) / 3.0;
+
+	//	//z1 = (m.verticesProjected[f1.points[0]].p.z + m.verticesProjected[f1.points[1]].p.z + m.verticesProjected[f1.points[2]].p.z);
+	//	//z1 = (m.verticesProjected[f2.points[0]].p.z + m.verticesProjected[f2.points[1]].p.z + m.verticesProjected[f2.points[2]].p.z);
+
+	//	return z1 < z2;
+	//	});
+
+
 
 	//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
 
-	vector<vec3d> pos;
+	//vector<vec3d> pos;
 
 	for (auto face : m.faces) {
 
-		SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 
 		int j;
-		pos.clear();
-		vec3d abc = { 0,0,-1 };
-		//float d = dot(face.normal, abc);
-		float d = face.normal.z;
+		//pos.clear();
+		vec3d abc = { 0,0,1 };
+		float d = dot(face.normal, abc);
+		//float d = face.normal.z;
 
-		if (d < 0) {
+		if (d > 0) {
 			continue;
-			SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+			//SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
 			int tt = 0;
 		}
 		if (face.normal.y > 0) {
-			SDL_SetRenderDrawColor(renderer, 0, 125, 125, 125);
-
-		}
-
-		for (size_t i = 0; i < 3; i++)
-		{
-
-			int index = face.points[i];
-
-			//m.verts[index].p;
-			//pos.push_back(m.verts[index].p);
-
-			for (auto v : m.vertices) {
-
-				if (v.id == index) {
-					//v.p.y = -v.p.y;
-					pos.push_back(v.p);
-					int t = 0;
-					break;
-				}
-
-			}
+			//SDL_SetRenderDrawColor(renderer, 0, 125, 125, 125);
+			float col = -face.normal.y * 255;
+			SDL_SetRenderDrawColor(renderer, col, col, col, 255);
 
 		}
 
 
 
 		//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-		fillTriangle(face.pos);
 		//fillTriangle(pos);
+
+		vector<vec3d> tri = { m.verticesProjected[face.points[0]].p ,m.verticesProjected[face.points[1]].p ,m.verticesProjected[face.points[2]].p };
+
+		fillTriangle(tri);
 
 		for (size_t i = 0; i < 3; i++) {
 			if (i != 2) {
@@ -626,20 +782,15 @@ void drawTris(meshv m) {
 				j = 0;
 			}
 
-
-			//SDL_Point points[2] = {
-			//{pos[i].x + WIDTH / 2,pos[i].y + HEIGHT / 2},
-			//{pos[j].x + WIDTH / 2, pos[j].y + HEIGHT / 2},
-			//};
-
 			SDL_Point points[2] = {
-			{face.pos[i].x + WIDTH / 2,face.pos[i].y + HEIGHT / 2},
-			{face.pos[j].x + WIDTH / 2, face.pos[j].y + HEIGHT / 2},
+			{m.verticesProjected[face.points[i]].p.x + WIDTH / 2,m.verticesProjected[face.points[i]].p.y + HEIGHT / 2},
+			{m.verticesProjected[face.points[j]].p.x + WIDTH / 2, m.verticesProjected[face.points[j]].p.y + HEIGHT / 2},
 			};
-			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+			//SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
 
-			SDL_RenderDrawLines(renderer, points, 2);
+			//SDL_RenderDrawLines(renderer, points, 2);
 		}
+		//break;
 
 	}
 
@@ -675,12 +826,13 @@ vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& ax
 	vec3d center;
 	center.x = mCenter.x;
 	center.y = mCenter.y;
-	center.z = 50;
+	center.z = 0;
 
 	vec3d p = { point.x - center.x, point.y - center.y, point.z - center.z };
 
 	// Normalize the axis
-	float length = std::sqrt(axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
+	// sqrt
+	float length = (axis.x * axis.x + axis.y * axis.y + axis.z * axis.z);
 	vec3d u = { axis.x / length, axis.y / length, axis.z / length };
 
 	// Rodrigues' rotation formula
@@ -700,23 +852,67 @@ void move(meshv& m, vec3d v) {
 }
 
 void rotate(meshv& m, const vec3d& axis, float angle) {
-	meshv mP = m;
-	project(mP);
-	for (auto& vert : m.vertices) {
+	//meshv mP = m;
+	//project(mP);
+	//for (auto& vert : m.vertices) {
 
-		vec3d rotated = rotateAroundPoint(vert.p, m.position, axis, angle);
+	//	vec3d rotated = rotateAroundPoint(vert.p, m.position, axis, angle);
 
-		vert.p.x = rotated.x;
-		vert.p.y = rotated.y;
-		vert.p.z = rotated.z;
+
+	//	vert.p.x = rotated.x;
+	//	vert.p.y = rotated.y;
+	//	vert.p.z = rotated.z;
+
+	//	//m.verticesProjected[vert.id].p.x = rotated.x;
+	//	//m.verticesProjected[vert.id].p.y = rotated.y;
+	//	//m.verticesProjected[vert.id].p.z = rotated.z;
+
+	//	int t = 0;
+	//}
+
+	for (size_t i = 0; i < m.vertices.size(); i++)
+	{
+		vec3d rotated = rotateAroundPoint(m.vertices[i].p, m.position, axis, angle);
+
+
+		if (m.vertices[i].id == 1840) {
+			int a = 0;
+		}
+
+		m.vertices[i].p.x = rotated.x;
+		m.vertices[i].p.y = rotated.y;
+		m.vertices[i].p.z = rotated.z;
+
+		//m.verticesProjected[i].p.x = rotated.x;
+		//m.verticesProjected[i].p.y = rotated.y;
+		//m.verticesProjected[i].p.z = rotated.z;
+
+		//m.verticesProjected[i].p.x = m.vertices[i].p.x;
+		//m.verticesProjected[i].p.y = m.vertices[i].p.y;
+		m.verticesProjected[i].p.z = m.vertices[i].p.z;
+
 	}
-	int t = 0;
+
 	for (auto& f : m.faces) {
 
-		vec3d v1 = subVector(mP.vertices[f.points[1]].p, mP.vertices[f.points[0]].p);
-		vec3d v2 = subVector(mP.vertices[f.points[2]].p, mP.vertices[f.points[0]].p);
+		//for (size_t i = 0; i < 3; i++)
+		//{
+		//	vec3d rotated = rotateAroundPoint(m.vertices[f.points[i]].p, m.position, axis, angle);
+		//	m.vertices[f.points[i]].p.x = rotated.x;
+		//	m.vertices[f.points[i]].p.y = rotated.y;
+		//	m.vertices[f.points[i]].p.z = rotated.z;
+		//}
+
+		vec3d v1 = subVector(m.vertices[f.points[1]].p, m.vertices[f.points[0]].p);
+		vec3d v2 = subVector(m.vertices[f.points[2]].p, m.vertices[f.points[0]].p);
+
 		vec3d normal = cross(v1, v2);
+
+
+		normalize(normal);
 		f.normal = normal;
+
+
 	}
 	int ta = 0;
 
@@ -738,7 +934,9 @@ int main(int argc, char* argv[])
 
 	int close = 0;
 
-
+	meshv importM;
+	importMesh("teapot.obj", importM);
+	importM.position = { 0,-50,800 };
 
 	SDL_SetRenderDrawColor(renderer, 255 * 0.227, 255 * 0.227, 255 * 0.227, 255);
 	SDL_RenderClear(renderer);
@@ -763,8 +961,8 @@ int main(int argc, char* argv[])
 
 	//
 			//*********
-	float z1 = -50;
-	float z2 = 50;
+	float z1 = 50;
+	float z2 = -50;
 
 	meshv cubeV;
 	cubeV.position = { 0,0,500 };
@@ -779,8 +977,8 @@ int main(int argc, char* argv[])
 	//	}
 	//);
 
-	//cubeV.addFace({ 
-	//	{3,5,7} });
+	//cubeV.addFace({
+	//	{0,1,2},{5,4,6} });
 
 
 	cubeV.addFace({ {0,1,2},{1,3,2},{5,4,6},
@@ -793,6 +991,7 @@ int main(int argc, char* argv[])
 
 	//rotate(cubeV, { 1, 1, 1 }, 3.14159f * 193 / 250);
 	//
+	//rotate(importM, { 0, 1, 0 }, 3.14159f*50 / 50);
 
 #pragma endregion
 
@@ -803,14 +1002,20 @@ int main(int argc, char* argv[])
 
 		auto start = std::chrono::high_resolution_clock::now();
 
+		reinitializeZBuffer(zBuffer, WIDTH, HEIGHT);
+
 		SDL_SetRenderDrawColor(renderer, 255 * 0.227, 255 * 0.227, 255 * 0.227, 255);
 		SDL_RenderClear(renderer);
 
 		SDL_Event event;
 
-		//rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
+		//drawTris(cubeV);
+		drawTris(importM);
 
-		drawTris(cubeV);
+		//rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
+		rotate(importM, { 0, 1, 0 }, 3.14159f / 50);
+
+
 
 
 		while (SDL_PollEvent(&event)) {
@@ -831,7 +1036,7 @@ int main(int argc, char* argv[])
 					break;
 				case SDL_SCANCODE_A:
 				case SDL_SCANCODE_LEFT:
-					move(cubeV, { 10,0,0 });
+					move(importM, { 10,0,0 });
 					break;
 				case SDL_SCANCODE_S:
 				case SDL_SCANCODE_DOWN:
@@ -839,10 +1044,10 @@ int main(int argc, char* argv[])
 					break;
 				case SDL_SCANCODE_D:
 				case SDL_SCANCODE_RIGHT:
-					move(cubeV, { -10,0,0 });
+					move(importM, { -10,0,0 });
 					break;
 				case SDL_SCANCODE_G:
-					rotate(cubeV, { 1, 1, 1 }, 3.14159f / 250);
+					rotate(importM, { 0, 1, 0 }, 3.14159f / 250);
 					break;
 				default:
 					break;
@@ -850,16 +1055,17 @@ int main(int argc, char* argv[])
 			}
 
 		}
+		SDL_SetRenderDrawColor(renderer, 255 * 1, 255 * 1, 255 * 1, 255);
 
-
+		//SDL_RenderDrawPoint(renderer, 0+a, 0+a);
 
 		auto end = std::chrono::high_resolution_clock::now();
 
 		// Calculate the duration
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
+		//rotate(importM, { 0, 1, 0 }, 3.14159f * duration.count() / 4000);
 		// Output the duration in milliseconds
-		//std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
+		std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
 
 
 		SDL_RenderPresent(renderer);
