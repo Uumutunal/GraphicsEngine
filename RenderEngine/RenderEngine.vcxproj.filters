@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="include">
+      <UniqueIdentifier>{06133110-30ab-4d0a-b459-408579e31727}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="RenderEngine.cpp">
@@ -25,6 +28,18 @@
     </ClInclude>
     <ClInclude Include="methods.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\structs.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\vectorCalc.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="importer.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="mesh.h">
+      <Filter>include</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

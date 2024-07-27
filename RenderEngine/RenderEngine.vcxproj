@@ -151,6 +151,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\Downloads\SDL-release-2.30.5\SDL-release-2.30.5\include\SDL.h" />
+    <ClInclude Include="importer.h" />
+    <ClInclude Include="include\structs.h" />
+    <ClInclude Include="include\vectorCalc.h" />
+    <ClInclude Include="mesh.h" />
     <ClInclude Include="methods.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

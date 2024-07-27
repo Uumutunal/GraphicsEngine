@@ -3,22 +3,24 @@
 #include<vector>
 #include<math.h>
 #include <chrono>
-#include"methods.h"
 #include <map>
 #include <algorithm>
 #include <fstream>
 #include <strstream>
 
-
 using namespace std;
 
-struct pixel
-{
-	float depth;
-};
 
-const int WIDTH = 800;
-const int HEIGHT = 800;
+#include"methods.h"
+#include"include/structs.h"
+#include"include/vectorCalc.h"
+#include"mesh.h"
+#include"importer.h"
+
+
+
+const int WIDTH = 1000;
+const int HEIGHT = 1000;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 
@@ -37,62 +39,6 @@ float fNear = 300;
 float fFar = 0;
 
 
-
-struct vec2d
-{
-	float x, y;
-};
-
-
-
-struct vec3d
-{
-	float x, y, z;
-};
-
-struct vertex {
-	vec3d p;
-	int id;
-	vec3d normal;
-};
-struct face {
-	vector<int> points;
-	vector<vec3d> pos;
-	vec3d normal;
-};
-
-
-
-// Cross product
-vec3d cross(const vec3d& a, const vec3d& b) {
-	return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
-}
-vec3d subVector(const vec3d& vec1, const vec3d& vec2) {
-	vec3d subbed;
-	subbed.x = vec1.x - vec2.x;
-	subbed.y = vec1.y - vec2.y;
-	subbed.z = vec1.z - vec2.z;
-
-	return subbed;
-}
-// Dot product
-float dot(const vec3d& a, const vec3d& b) {
-	return a.x * b.x + a.y * b.y + a.z * b.z;
-}
-
-void normalize(vec3d& v) {
-
-	float length = sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-
-	if (length == 0) {
-		return;
-	}
-
-	v.x /= length;
-	v.y /= length;
-	v.z /= length;
-
-}
 
 void drawLine(SDL_Renderer* renderer, const SDL_Point* points, float depth) {
 
@@ -119,154 +65,13 @@ void drawLine(SDL_Renderer* renderer, const SDL_Point* points, float depth) {
 
 }
 
-struct meshv
-{
-
-
-private:
-	int index = 0;
-
-public:
-	vector<vertex> vertices;
-	vector<vertex> verticesProjected;
-
-	map<int, vertex> verts;
-
-	vector<face> faces;
-
-	vec3d cameraPos;
-
-	vec3d position;
-
-
-	void addVertex(vector<vertex> verticesA) {
-		for (size_t i = 0; i < verticesA.size(); i++)
-		{
-			vertex v;
-			v.p = verticesA[i].p;
-			v.id = index;
-			vertices.push_back(v);
-			verticesProjected.push_back(v);
-			verts[index] = verticesA[i];
-
-			index++;
-
-		}
-	}
-
-	void addFace(vector<vector<int>> facesA) {
-		for (size_t i = 0; i < facesA.size(); i++)
-		{
-			face f;
-			f.points = facesA[i];
-			vector<vec3d> posV;
-			posV.push_back(verts[facesA[i][0]].p);
-			posV.push_back(verts[facesA[i][1]].p);
-			posV.push_back(verts[facesA[i][2]].p);
-
-			vec3d v1 = subVector(verts[facesA[i][1]].p, verts[facesA[i][0]].p);
-			vec3d v2 = subVector(verts[facesA[i][2]].p, verts[facesA[i][0]].p);
-
-			vec3d normal = cross(v1, v2);
-
-			normalize(normal);
-
-			verts[facesA[i][0]].normal = normal;
-			verts[facesA[i][1]].normal = normal;
-			verts[facesA[i][2]].normal = normal;
-
-			f.normal = normal;
-
-			f.pos = posV;
-			faces.push_back(f);
-		}
-	}
-
-};
 
 
 
-struct camera {
-	vec3d position = { 0,0,0 };
-	vec3d rotation = { 0,0,0 };
-};
 
 
-bool importMesh(string sFilename, meshv& importedMesh) {
-
-	//meshv importedMesh;
 
 
-	ifstream f(sFilename);
-	if (!f.is_open())
-		return false;
-
-	// Local cache of verts
-	vector<vertex> verts;
-	vector<vec3d> vertsP;
-	vector<face> faces;
-	map<int, vertex> vv;
-
-	vector<vector<int>> facesA;
-
-	int index = 0;
-	while (!f.eof())
-	{
-		char line[128];
-		f.getline(line, 128);
-
-		strstream s;
-		s << line;
-
-		char junk;
-
-		if (line[0] == 'v')
-		{
-			vertex vert;
-			vec3d v;
-			s >> junk >> v.x >> v.y >> v.z;
-			vert.p = v;
-			vert.id = index;
-			verts.push_back(vert);
-			vertsP.push_back(v);
-			vv[index] = vert;
-			index++;
-		}
-
-		if (line[0] == 'f')
-		{
-			face ff;
-
-			int f[3];
-			s >> junk >> f[0] >> f[1] >> f[2];
-
-			ff.points.push_back(f[2] - 1);
-			ff.points.push_back(f[1] - 1);
-			ff.points.push_back(f[0] - 1);
-
-			facesA.push_back(ff.points);
-
-			ff.pos.push_back(vertsP[f[2] - 1]);
-			ff.pos.push_back(vertsP[f[1] - 1]);
-			ff.pos.push_back(vertsP[f[0] - 1]);
-
-			vec3d v1 = subVector(vertsP[f[1] - 1], vertsP[f[0] - 1]);
-			vec3d v2 = subVector(vertsP[f[2] - 1], vertsP[f[0] - 1]);
-			vec3d normal = cross(v1, v2);
-			normalize(normal);
-			ff.normal = normal;
-
-			faces.push_back(ff);
-		}
-	}
-
-	importedMesh.addVertex(verts);
-	importedMesh.addFace(facesA);
-
-	importedMesh.position = { 0,0,500 };
-
-	return true;
-}
 
 
 
@@ -647,23 +452,6 @@ void drawTris(meshv& m) {
 
 
 
-vec3d multiplayVector(vec3d vec, float f) {
-	vec3d multiplied;
-	multiplied.x = vec.x * f;
-	multiplied.y = vec.y * f;
-	multiplied.z = vec.z * f;
-
-	return multiplied;
-}
-
-vec3d addVector(vec3d vec1, vec3d vec2) {
-	vec3d added;
-	added.x = vec1.x + vec2.x;
-	added.y = vec1.y + vec2.y;
-	added.z = vec1.z + vec2.z;
-
-	return added;
-}
 
 
 
@@ -830,7 +618,7 @@ int main(int argc, char* argv[])
 	int close = 0;
 
 	meshv importM;
-	importMesh("teapot.obj", importM);
+	importMesh("../models/teapot.obj", importM);
 	importM.position = { 0,-50,800 };
 
 	SDL_SetRenderDrawColor(renderer, 255 * 0.227, 255 * 0.227, 255 * 0.227, 255);
@@ -847,7 +635,8 @@ int main(int argc, char* argv[])
 	int a = 0;
 	float time = 0;
 
-
+	print();
+	print2();
 
 #pragma region cube
 

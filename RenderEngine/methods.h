@@ -5,5 +5,8 @@
 
 
 
+void print() {
+	std::cout << "header" << std::endl;
+}
 
 #endif
