@@ -35,7 +35,7 @@ void reinitializeZBuffer(std::vector<std::vector<pixel>>& zBuffer, int width, in
 }
 
 
-float fNear = 300;
+float fNear = 1000;
 float fFar = 0;
 
 
@@ -64,44 +64,6 @@ void drawLine(SDL_Renderer* renderer, const SDL_Point* points, float depth) {
 	}
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-void drawTris(float tri[][2]) {
-
-
-	SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-	int j;
-	for (size_t i = 0; i < 3; i++)
-	{
-		if (i != 2) {
-			j = i + 1;
-		}
-		else {
-			j = 0;
-		}
-
-
-		SDL_Point points[2] = {
-		{tri[i][0], tri[i][1]},
-		{tri[j][0], tri[j][1]},
-		};
-
-		SDL_RenderDrawLines(renderer, points, 2);
-	}
-
-}
-
 
 
 
@@ -159,30 +121,7 @@ void project(meshv& m) {
 
 
 
-
-bool fillTriangle2(vec3d p, vec3d a, vec3d b, vec3d c) {
-	// Compute vectors
-	vec2d v0 = { c.x - a.x, c.y - a.y };
-	vec2d v1 = { b.x - a.x, b.y - a.y };
-	vec2d v2 = { p.x - a.x, p.y - a.y };
-
-	// Compute dot products
-	float dot00 = v0.x * v0.x + v0.y * v0.y;
-	float dot01 = v0.x * v1.x + v0.y * v1.y;
-	float dot02 = v0.x * v2.x + v0.y * v2.y;
-	float dot11 = v1.x * v1.x + v1.y * v1.y;
-	float dot12 = v1.x * v2.x + v1.y * v2.y;
-
-	// Compute barycentric coordinates
-	float invDenom = 1 / (dot00 * dot11 - dot01 * dot01);
-	float u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-	float v = (dot00 * dot12 - dot01 * dot02) * invDenom;
-
-	// Check if point is in triangle
-	return (u >= 0) && (v >= 0) && (u + v <= 1);
-}
-
-
+//TODO: rewrite
 void fillTriangle(vector<vec3d> vertices) {
 
 	if (vertices.size() < 3) {
@@ -383,8 +322,6 @@ void fillTriangle(vector<vec3d> vertices) {
 			}
 		}
 	}
-
-	return;
 
 }
 
@@ -603,7 +540,85 @@ void rotateCamera(meshv& m, camera cam, const vec3d& axis, float angle) {
 	}
 }
 
+void drawGrid(camera cam) {
 
+	SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+
+
+	int range = cam.position.x / 100;
+
+	for (int i = -WIDTH - range*100 - 1000; i < WIDTH - range*100 + 1000; i += 100)
+	{
+
+		vec3d lineStart = { i, 0, fFar + 200 };
+		vec3d lineEnd = { i, 0, fNear + 4000 };
+
+		lineStart.x += cam.position.x;
+		lineStart.y += cam.position.y;
+
+		lineEnd.x += cam.position.x;
+		lineEnd.y += cam.position.y;
+
+
+
+
+		float z1 = lineEnd.z;
+		float z2 = lineStart.z;
+
+		float zRate1 = (fFar - fNear) / (z1);
+		float zRate2 = (fFar - fNear) / (z2);
+
+
+		lineEnd.x = lineEnd.x * zRate1;
+		lineEnd.y = lineEnd.y * zRate1;
+
+		lineStart.x = lineStart.x * zRate2;
+		lineStart.y = lineStart.y * zRate2;
+
+		SDL_RenderDrawLine(renderer, lineStart.x + WIDTH / 2, lineStart.y + HEIGHT / 2,
+			lineEnd.x + WIDTH / 2, lineEnd.y + HEIGHT / 2);
+
+
+	}
+
+	for (int j = 0; j < 5000; j += 100)
+	{
+		vec3d lineStart = { -2000 - range * 100, 0, j };
+		vec3d lineEnd = { 2000 - range * 100, 0, j };
+
+		lineStart.x += cam.position.x;
+		lineStart.y += cam.position.y;
+
+		lineEnd.x += cam.position.x;
+		lineEnd.y += cam.position.y;
+
+
+
+
+		float z1 = lineEnd.z;
+		float z2 = lineStart.z;
+
+		float zRate1 = (fFar - fNear) / (z1);
+		float zRate2 = (fFar - fNear) / (z2);
+
+
+		//SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+
+		lineEnd.x = lineEnd.x * zRate1;
+		lineEnd.y = lineEnd.y * zRate1;
+
+		lineStart.x = lineStart.x * zRate2;
+		lineStart.y = lineStart.y * zRate2;
+		
+
+
+		//SDL_RenderDrawLine(renderer, lineStart.x, lineStart.y, lineEnd.x, lineEnd.y);
+		SDL_RenderDrawLine(renderer, lineStart.x + WIDTH / 2, lineStart.y + HEIGHT / 2,
+			lineEnd.x + WIDTH / 2, lineEnd.y + HEIGHT / 2);
+	}
+
+
+}
 
 
 int main(int argc, char* argv[])
@@ -687,7 +702,6 @@ int main(int argc, char* argv[])
 	bool shiftPressed = false;
 
 
-
 	//meshv& renderedMesh = cubeV;
 	meshv& renderedMesh = importM;
 
@@ -708,6 +722,8 @@ int main(int argc, char* argv[])
 
 		//rotate(renderedMesh, { 1, 1, 1 }, 3.14159f / 250);
 		//rotate(importM, { 0, 1, 0 }, 3.14159f / 50);
+
+		drawGrid(mainCamera);
 
 
 
@@ -791,17 +807,19 @@ int main(int argc, char* argv[])
 
 				break;
 
+			//Zoom
 			case SDL_MOUSEWHEEL:
 				cout << "mouse wheel " << event.wheel.y << endl;
 
 				vec3d moveDir = { 0,0,30 * event.wheel.y };
 
 				move(renderedMesh, moveDir);
+				mainCamera.position.z = moveDir.z;
 				break;
 
 			}
 
-			
+
 			switch (event.type) {
 			case SDL_MOUSEBUTTONDOWN:
 				cout << "mouse wheel down" << endl;
@@ -871,11 +889,11 @@ int main(int argc, char* argv[])
 			mouseX = x;
 			mouseY = y;
 
-			mainCamera.position = moveDir;
+			mainCamera.position.x += moveDir.x;
+			mainCamera.position.y += moveDir.y;
+
 
 			move(renderedMesh, moveDir);
-			
-			//cout << "wheel pressed" << endl;
 		}
 
 		//Rotate camera
@@ -891,11 +909,13 @@ int main(int argc, char* argv[])
 			mouseX = x;
 			mouseY = y;
 
-			mainCamera.position = moveDir;
+			mainCamera.position.x += moveDir.x;
+
+			//cout << mainCamera.position.x << endl;
 
 			rotateCamera(renderedMesh, mainCamera, { 0,1,0 }, 3.14 * (moveDir.x) / 50);
 			rotateCamera(renderedMesh, mainCamera, { 1,0,0 }, -3.14 * (moveDir.y) / 50);
-			
+
 			//cout << "wheel pressed" << endl;
 		}
 
