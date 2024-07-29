@@ -3,8 +3,6 @@
 #include<vector>
 #include<math.h>
 #include <chrono>
-#include <map>
-#include <algorithm>
 #include <fstream>
 #include <strstream>
 
@@ -14,8 +12,8 @@ using namespace std;
 #include"methods.h"
 #include"include/structs.h"
 #include"include/vectorCalc.h"
-#include"mesh.h"
-#include"importer.h"
+#include"include/mesh.h"
+#include"include/importer.h"
 
 
 
@@ -35,7 +33,7 @@ void reinitializeZBuffer(std::vector<std::vector<pixel>>& zBuffer, int width, in
 }
 
 
-float fNear = 1000;
+float fNear = 500;
 float fFar = 0;
 
 
@@ -69,17 +67,6 @@ void drawLine(SDL_Renderer* renderer, const SDL_Point* points, float depth) {
 
 void project(meshv& m) {
 
-	//for (auto& vert : m.vertices) {
-
-	//	float z = m.position.z + vert.p.z;
-
-	//	float zRate = z / (fFar - fNear);
-
-	//	//zRate = 1;
-
-	//	vert.p.x = (m.position.x + vert.p.x) * zRate;
-	//	vert.p.y = (m.position.y + vert.p.y) * zRate;
-	//}
 	for (size_t i = 0; i < m.vertices.size(); i++)
 	{
 		float z = m.position.z + m.vertices[i].p.z;
@@ -91,21 +78,6 @@ void project(meshv& m) {
 		m.verticesProjected[i].p.y = (m.position.y + m.vertices[i].p.y) * zRate;
 	}
 
-	//TODO: check this
-	//for (auto& face : m.faces) {
-	//for (int j = 0; j < m.faces.size(); j++) {
-	//	for (size_t i = 0; i < 3; i++)
-	//	{
-	//		float z = m.position.z + m.faces[j].pos[0].z;
-
-	//		float zRate = z / (fFar - fNear);
-
-	//		//zRate = 1;
-
-	//		m.faces[j].pos[i].x = (m.position.x + m.faces[j].pos[i].x) * zRate;
-	//		m.faces[j].pos[i].y = (m.position.y + m.faces[j].pos[i].y) * zRate;
-	//	}
-	//}
 
 	for (auto& f : m.faces) {
 
@@ -356,9 +328,6 @@ void drawTris(meshv& m) {
 
 
 
-		//SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-		//fillTriangle(pos);
-
 		vector<vec3d> tri = { m.verticesProjected[face.points[0]].p ,m.verticesProjected[face.points[1]].p ,m.verticesProjected[face.points[2]].p };
 
 		fillTriangle(tri);
@@ -379,7 +348,7 @@ void drawTris(meshv& m) {
 
 			//SDL_RenderDrawLines(renderer, points, 2);
 		}
-		//break;
+
 
 	}
 
@@ -389,11 +358,20 @@ void drawTris(meshv& m) {
 
 
 
+void move(meshv& m, vec3d v) {
+
+
+	m.position.x += v.x;
+	m.position.y += v.y;
+	m.position.z += v.z;
+
+
+}
 
 
 
 // Rotate point around an axis
-vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& axis, float angle, bool camera) {
+vec3d rotateAroundPoint(vec3d& point, const vec3d mCenter, const vec3d& axis, float angle, bool camera) {
 	// Translate point to origin
 	vec3d center;
 
@@ -422,37 +400,18 @@ vec3d rotateAroundPoint(const vec3d& point, const vec3d mCenter, const vec3d& ax
 			multiplayVector(multiplayVector(u, dot(u, p)), (1 - std::cos(angle))));
 
 	// Translate point back
+
+	point.x = p_rot.x + center.x;
+	point.y = p_rot.y + center.y;
+	point.z = p_rot.z + center.z;
+
+
 	return { p_rot.x + center.x, p_rot.y + center.y, p_rot.z + center.z };
 }
 
-void move(meshv& m, vec3d v) {
-
-
-	m.position.x += v.x;
-	m.position.y += v.y;
-	m.position.z += v.z;
-
-
-}
 
 void rotate(meshv& m, const vec3d& axis, float angle) {
-	//meshv mP = m;
-	//project(mP);
-	//for (auto& vert : m.vertices) {
 
-	//	vec3d rotated = rotateAroundPoint(vert.p, m.position, axis, angle);
-
-
-	//	vert.p.x = rotated.x;
-	//	vert.p.y = rotated.y;
-	//	vert.p.z = rotated.z;
-
-	//	//m.verticesProjected[vert.id].p.x = rotated.x;
-	//	//m.verticesProjected[vert.id].p.y = rotated.y;
-	//	//m.verticesProjected[vert.id].p.z = rotated.z;
-
-	//	int t = 0;
-	//}
 
 	for (size_t i = 0; i < m.vertices.size(); i++)
 	{
@@ -479,13 +438,6 @@ void rotate(meshv& m, const vec3d& axis, float angle) {
 
 	for (auto& f : m.faces) {
 
-		//for (size_t i = 0; i < 3; i++)
-		//{
-		//	vec3d rotated = rotateAroundPoint(m.vertices[f.points[i]].p, m.position, axis, angle);
-		//	m.vertices[f.points[i]].p.x = rotated.x;
-		//	m.vertices[f.points[i]].p.y = rotated.y;
-		//	m.vertices[f.points[i]].p.z = rotated.z;
-		//}
 
 		vec3d v1 = subVector(m.verticesProjected[f.points[1]].p, m.verticesProjected[f.points[0]].p);
 		vec3d v2 = subVector(m.verticesProjected[f.points[2]].p, m.verticesProjected[f.points[0]].p);
@@ -540,6 +492,8 @@ void rotateCamera(meshv& m, camera cam, const vec3d& axis, float angle) {
 	}
 }
 
+//Fix camera clipping
+
 void drawGrid(camera cam) {
 
 	SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
@@ -547,7 +501,7 @@ void drawGrid(camera cam) {
 
 	int range = cam.position.x / 100;
 
-	for (int i = -WIDTH - range*100 - 1000; i < WIDTH - range*100 + 1000; i += 100)
+	for (int i = -WIDTH - range * 100 - 1000; i < WIDTH - range * 100 + 1000; i += 100)
 	{
 
 		vec3d lineStart = { i, 0, fFar + 200 };
@@ -555,11 +509,18 @@ void drawGrid(camera cam) {
 
 		lineStart.x += cam.position.x;
 		lineStart.y += cam.position.y;
+		lineStart.z += cam.position.z;
 
 		lineEnd.x += cam.position.x;
 		lineEnd.y += cam.position.y;
+		lineEnd.z += cam.position.z;
 
 
+		rotateAroundPoint(lineStart, cam.position, { 0,1,0 }, -cam.rotation.y, true);
+		rotateAroundPoint(lineStart, { 0,0,500 }, { 1,0,0 }, -cam.rotation.x, true);
+
+		rotateAroundPoint(lineEnd, cam.position, { 0,1,0 }, -cam.rotation.y, true);
+		rotateAroundPoint(lineEnd, { 0,0,500 }, { 1,0,0 }, -cam.rotation.x, true);
 
 
 		float z1 = lineEnd.z;
@@ -568,12 +529,20 @@ void drawGrid(camera cam) {
 		float zRate1 = (fFar - fNear) / (z1);
 		float zRate2 = (fFar - fNear) / (z2);
 
+		if (zRate1 > 0) {
+			continue;
+		}
+		if (zRate2 > 0) {
+			continue;
+		}
 
 		lineEnd.x = lineEnd.x * zRate1;
 		lineEnd.y = lineEnd.y * zRate1;
 
 		lineStart.x = lineStart.x * zRate2;
 		lineStart.y = lineStart.y * zRate2;
+
+
 
 		SDL_RenderDrawLine(renderer, lineStart.x + WIDTH / 2, lineStart.y + HEIGHT / 2,
 			lineEnd.x + WIDTH / 2, lineEnd.y + HEIGHT / 2);
@@ -583,8 +552,8 @@ void drawGrid(camera cam) {
 
 	for (int j = 0; j < 5000; j += 100)
 	{
-		vec3d lineStart = { -2000 - range * 100, 0, j };
-		vec3d lineEnd = { 2000 - range * 100, 0, j };
+		vec3d lineStart = { -2000 - range * 10, 0, j };
+		vec3d lineEnd = { 2000 - range * 10, 0, j };
 
 		lineStart.x += cam.position.x;
 		lineStart.y += cam.position.y;
@@ -593,7 +562,38 @@ void drawGrid(camera cam) {
 		lineEnd.y += cam.position.y;
 
 
+		rotateAroundPoint(lineStart, cam.position, { 0,1,0 }, -cam.rotation.y, true);
+		rotateAroundPoint(lineStart, { 0,0,500 }, { 1,0,0 }, -cam.rotation.x, true);
 
+		rotateAroundPoint(lineEnd, cam.position, { 0,1,0 }, -cam.rotation.y, true);
+		rotateAroundPoint(lineEnd, { 0,0,500 }, { 1,0,0 }, -cam.rotation.x, true);
+
+
+		if (lineStart.z < 0) {
+			float A;
+			float B;
+			float C;
+
+			A = lineEnd.y - lineStart.y;
+			B = (lineStart.x - lineEnd.x);
+			C = (lineEnd.x * lineStart.y) - (lineStart.x * lineEnd.y);
+
+			vec3d direction = { lineEnd.x - lineStart.x, lineEnd.y - lineStart.y, lineEnd.z - lineStart.z };
+
+			float t = -lineStart.z / direction.z;
+
+			float x = lineStart.x + t * direction.x;
+			float y = lineStart.y + t * direction.y;
+			float z = 0;
+
+			//lineStart.x = x;
+			//lineStart.y = y;
+
+			//lineStart.x *= -1;
+			//lineStart.y *= -1;
+			lineStart.z *= -1;
+
+		}
 
 		float z1 = lineEnd.z;
 		float z2 = lineStart.z;
@@ -601,20 +601,25 @@ void drawGrid(camera cam) {
 		float zRate1 = (fFar - fNear) / (z1);
 		float zRate2 = (fFar - fNear) / (z2);
 
+		if (zRate1 > 0 || zRate2 > 0) {
+			//continue;
+		}
 
-		//SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
+
 
 		lineEnd.x = lineEnd.x * zRate1;
 		lineEnd.y = lineEnd.y * zRate1;
 
 		lineStart.x = lineStart.x * zRate2;
 		lineStart.y = lineStart.y * zRate2;
-		
+
 
 
 		//SDL_RenderDrawLine(renderer, lineStart.x, lineStart.y, lineEnd.x, lineEnd.y);
 		SDL_RenderDrawLine(renderer, lineStart.x + WIDTH / 2, lineStart.y + HEIGHT / 2,
 			lineEnd.x + WIDTH / 2, lineEnd.y + HEIGHT / 2);
+
+
 	}
 
 
@@ -650,16 +655,12 @@ int main(int argc, char* argv[])
 	int a = 0;
 	float time = 0;
 
-	print();
-	print2();
 
 #pragma region cube
 
 	SDL_SetRenderDrawColor(renderer, 255 * 0.227, 255 * 0.227, 255 * 0.227, 255);
 	SDL_RenderClear(renderer);
 
-	//
-			//*********
 	float z1 = 50;
 	float z2 = -50;
 
@@ -685,12 +686,6 @@ int main(int argc, char* argv[])
 		{4,5,0},{5,1,0},{1,5,3},
 		{3,5,7},{2,3,6},{3,7,6} });
 
-	//move(cubeV, { 100,100,25 });
-
-
-	//rotate(cubeV, { 1, 1, 1 }, 3.14159f * 193 / 250);
-	//
-	//rotate(importM, { 0, 1, 0 }, 3.14159f*50 / 50);
 
 #pragma endregion
 
@@ -723,7 +718,6 @@ int main(int argc, char* argv[])
 		//rotate(renderedMesh, { 1, 1, 1 }, 3.14159f / 250);
 		//rotate(importM, { 0, 1, 0 }, 3.14159f / 50);
 
-		drawGrid(mainCamera);
 
 
 
@@ -780,7 +774,7 @@ int main(int argc, char* argv[])
 					break;
 				case SDL_SCANCODE_LSHIFT:
 				case SDL_SCANCODE_RSHIFT:
-					std::cout << "Shift key down" << std::endl;
+					//std::cout << "Shift key down" << std::endl;
 					shiftPressed = true;
 					break;
 				default:
@@ -807,7 +801,7 @@ int main(int argc, char* argv[])
 
 				break;
 
-			//Zoom
+				//Zoom
 			case SDL_MOUSEWHEEL:
 				cout << "mouse wheel " << event.wheel.y << endl;
 
@@ -892,12 +886,14 @@ int main(int argc, char* argv[])
 			mainCamera.position.x += moveDir.x;
 			mainCamera.position.y += moveDir.y;
 
+			cout << "pan camera" << endl;
+
 
 			move(renderedMesh, moveDir);
 		}
 
 		//Rotate camera
-		if (SDL_GetMouseState(NULL, NULL) == 2) {
+		if (SDL_GetMouseState(NULL, NULL) == 2 && !shiftPressed) {
 			int x = 0;
 			int y = 0;
 			SDL_GetMouseState(&x, &y);
@@ -909,31 +905,36 @@ int main(int argc, char* argv[])
 			mouseX = x;
 			mouseY = y;
 
-			mainCamera.position.x += moveDir.x;
+			//mainCamera.position.x += moveDir.x;
 
 			//cout << mainCamera.position.x << endl;
 
 			rotateCamera(renderedMesh, mainCamera, { 0,1,0 }, 3.14 * (moveDir.x) / 50);
 			rotateCamera(renderedMesh, mainCamera, { 1,0,0 }, -3.14 * (moveDir.y) / 50);
 
-			//cout << "wheel pressed" << endl;
+			mainCamera.rotation.x += -3.14 * (moveDir.y) / 50;
+			mainCamera.rotation.y += -3.14 * (moveDir.x) / 50;
+
+			cout << "rotate camera" << endl;
 		}
 
 		SDL_SetRenderDrawColor(renderer, 255 * 1, 255 * 1, 255 * 1, 255);
 
-		//SDL_RenderDrawPoint(renderer, 0+a, 0+a);
 
 		auto end = std::chrono::high_resolution_clock::now();
 
 		// Calculate the duration
 		auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-		//rotate(importM, { 0, 1, 0 }, 3.14159f * duration.count() / 4000);
+
 		// Output the duration in milliseconds
 		//std::cout << "Time taken: " << duration.count() << " milliseconds" << std::endl;
 
 		int x = 0;
 		int y = 0;
 		SDL_GetMouseState(&x, &y);
+
+		//drawGrid(mainCamera);
+
 
 		//cout << y << endl;
 

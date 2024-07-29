@@ -152,6 +152,8 @@
   <ItemGroup>
     <ClInclude Include="..\..\..\..\..\Downloads\SDL-release-2.30.5\SDL-release-2.30.5\include\SDL.h" />
     <ClInclude Include="importer.h" />
+    <ClInclude Include="include\importer.h" />
+    <ClInclude Include="include\mesh.h" />
     <ClInclude Include="include\structs.h" />
     <ClInclude Include="include\vectorCalc.h" />
     <ClInclude Include="mesh.h" />

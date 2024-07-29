@@ -41,5 +41,11 @@
     <ClInclude Include="mesh.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\importer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\mesh.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
